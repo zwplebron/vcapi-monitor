@@ -10,6 +10,7 @@ from src.constants import (
     COLOR_BG, COLOR_ACCENT, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
     COLOR_CARD_BG, COLOR_BTN_TEXT, COLOR_BTN_DANGER_TEXT,
     SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT,
+    APP_VERSION,
 )
 from src.storage import load_api_key, save_api_key, clear_api_key
 
@@ -107,6 +108,13 @@ class SettingsWindow(tk.Toplevel):
         unbind_btn.pack(side="left")
         unbind_btn.bind("<ButtonPress-1>", lambda e: e.widget.config(bg="#FFEBEE"))
         unbind_btn.bind("<ButtonRelease-1>", lambda e: (e.widget.config(bg=COLOR_BG), self._do_unbind()))
+
+        # 版本号
+        tk.Label(
+            self, text=APP_VERSION,
+            font=("SF Pro Display", 9),
+            fg=COLOR_TEXT_SECONDARY, bg=COLOR_BG
+        ).pack(side="bottom", pady=(0, 8))
 
     def _mask_key(self, key: str) -> str:
         if len(key) <= 11:

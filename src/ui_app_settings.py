@@ -10,6 +10,7 @@ import tkinter as tk
 from src.constants import (
     COLOR_BG, COLOR_ACCENT, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
     COLOR_CARD_BG, COLOR_BTN_TEXT,
+    APP_VERSION,
 )
 from src.storage import load_settings, save_settings
 
@@ -177,8 +178,15 @@ class AppSettingsWindow(tk.Toplevel):
             fg=COLOR_TEXT_SECONDARY, bg="#E0E0E0",
             padx=24, pady=6
         )
-        self._save_btn.pack(pady=(16, 20))
+        self._save_btn.pack(pady=(16, 12))
         self._save_btn.bind("<ButtonRelease-1>", lambda e: self._do_save())
+
+        # 版本号
+        tk.Label(
+            self, text=APP_VERSION,
+            font=("SF Pro Display", 9),
+            fg=COLOR_TEXT_SECONDARY, bg=COLOR_BG
+        ).pack(side="bottom", pady=(0, 8))
 
     def _check_changes(self):
         """每次输入变更时，比较当前值与已保存值，决定按钮状态"""

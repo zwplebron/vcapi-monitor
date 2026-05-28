@@ -6,40 +6,65 @@ Deepseek 用量监控 — 全局常量定义
 """
 
 # ============================================================
-# 配色方案
+# 应用版本
 # ============================================================
 
-# 主色
-COLOR_BG = "#E3F2FD"            # 主背景（淡蓝 50）
-COLOR_ACCENT = "#2196F3"        # 强调色（蓝色 500）
-COLOR_ACCENT_DARK = "#1976D2"   # 深色强调（蓝色 700）
-COLOR_TITLE_BAR = "#BBDEFB"     # 标题栏背景（蓝色 100）
-COLOR_SEPARATOR = "#BBDEFB"     # 分隔线
+APP_VERSION = "v1.0.1"
 
-# 文字色
-COLOR_TEXT_PRIMARY = "#212121"   # 主文字（灰 900）
-COLOR_TEXT_SECONDARY = "#757575" # 次要文字（灰 600）
+# ============================================================
+# 配色方案 (v1.0.1 — 浅色极简风格)
+# ============================================================
 
-# 卡片/按钮
-COLOR_CARD_BG = "#FFFFFF"
-COLOR_BTN_TEXT = "#FFFFFF"
-COLOR_BTN_HOVER = "#1E88E5"
-COLOR_BTN_SECONDARY_TEXT = "#2196F3"
-COLOR_BTN_DANGER_TEXT = "#E53935"
+# 窗口 / 背景
+COLOR_WINDOW_BG = "#EDF1F5"           # 窗口背景（浅灰蓝，近似 macOS 风格）
+COLOR_TITLE_BAR = "#EDF1F5"           # 标题栏背景（与窗口一致）
+COLOR_TITLE_TEXT = "#1565C0"          # 标题品牌蓝
+COLOR_TITLE_ACCENT = "#1A1A2E"        # 标题辅助深色
+
+# 卡片
+COLOR_CARD_BG = "#FFFFFF"             # 卡片背景（纯白）
+COLOR_CARD_BORDER = "#E1E5EA"         # 卡片浅边框
+
+# 文字
+COLOR_TEXT_PRIMARY = "#1A1A2E"        # 主文字（深灰蓝）
+COLOR_TEXT_SECONDARY = "#8E8E93"      # 次要文字（iOS 灰色）
+
+# 按钮
+COLOR_BUTTON_PRIMARY = "#1976D2"      # 主按钮填充蓝
+COLOR_BUTTON_PRIMARY_HOVER = "#1565C0"
+COLOR_BUTTON_SECONDARY_BORDER = "#1976D2"  # 描边按钮边框
+COLOR_BTN_TEXT = "#FFFFFF"            # 主按钮文字（白）
 
 # 信号灯
-COLOR_LIGHT_GREEN = "#4CAF50"    # 余额充足
-COLOR_LIGHT_YELLOW = "#FFC107"   # 余额不足
-COLOR_LIGHT_RED = "#F44336"      # 余额告急
-COLOR_LIGHT_OFF = "#E0E0E0"      # 未激活
-COLOR_LIGHT_FRAME = "#424242"    # 灯框
-COLOR_LIGHT_GLOW_GREEN = "#A5D6A7"   # 外发光
-COLOR_LIGHT_GLOW_YELLOW = "#FFF9C4"  # 外发光
-COLOR_LIGHT_GLOW_RED = "#EF9A9A"     # 外发光
+COLOR_LIGHT_GREEN = "#34C759"
+COLOR_LIGHT_YELLOW = "#FFCC00"
+COLOR_LIGHT_RED = "#FF3B30"
+COLOR_LIGHT_OFF = "#E5E5EA"
+COLOR_LIGHT_FRAME = "#C7C7CC"
+COLOR_LIGHT_GLOW_GREEN = "#D4F5DD"
+COLOR_LIGHT_GLOW_YELLOW = "#FFF5CC"
+COLOR_LIGHT_GLOW_RED = "#FFD6D4"
 
-# 错误/状态
-COLOR_ERROR = "#E53935"
-COLOR_SUCCESS = "#4CAF50"
+# 状态文字
+COLOR_STATUS_OK = "#34C759"
+COLOR_STATUS_WARN = "#F57C00"
+COLOR_STATUS_DANGER = "#FF3B30"
+
+# 分割线
+COLOR_DIVIDER = "#E8ECF0"
+
+# 错误/提示
+COLOR_ERROR = "#FF3B30"
+COLOR_SUCCESS = "#34C759"
+
+# 向后兼容别名
+COLOR_BG = COLOR_WINDOW_BG
+COLOR_ACCENT = COLOR_BUTTON_PRIMARY
+COLOR_ACCENT_DARK = COLOR_BUTTON_PRIMARY_HOVER
+COLOR_SEPARATOR = COLOR_DIVIDER
+COLOR_BTN_HOVER = COLOR_BUTTON_PRIMARY_HOVER
+COLOR_BTN_SECONDARY_TEXT = COLOR_BUTTON_SECONDARY_BORDER
+COLOR_BTN_DANGER_TEXT = "#E53935"
 
 # ============================================================
 # 余额阈值（单位：元）
@@ -64,14 +89,14 @@ API_TIMEOUT = 10
 # 窗口尺寸
 # ============================================================
 
-MAIN_WINDOW_WIDTH = 280
-MAIN_WINDOW_HEIGHT = 340
+MAIN_WINDOW_WIDTH = 300
+MAIN_WINDOW_HEIGHT = 460
 
 BIND_WINDOW_WIDTH = 400
 BIND_WINDOW_HEIGHT = 320
 
 SETTINGS_WINDOW_WIDTH = 400
-SETTINGS_WINDOW_HEIGHT = 340
+SETTINGS_WINDOW_HEIGHT = 360
 
 # ============================================================
 # 刷新与快捷键

@@ -251,16 +251,16 @@ class MonitorWindow(tk.Toplevel):
         settings_btn.pack(side="left")
         self._settings_btn_bg = _round_rect(
             settings_btn, 0, 0, 110, 36, BTN_RADIUS,
-            fill="#E8ECF0"
+            fill="#D0D5DC"
         )
         settings_btn.create_text(
             55, 18, text="账号设置",
             font=("SF Pro Display", 12), fill=COLOR_TEXT_PRIMARY
         )
         settings_btn.bind("<ButtonPress-1>", lambda e: settings_btn.itemconfig(
-            self._settings_btn_bg, fill="#D0D5DC"))
+            self._settings_btn_bg, fill="#BCC2C9"))
         settings_btn.bind("<ButtonRelease-1>", lambda e: (
-            settings_btn.itemconfig(self._settings_btn_bg, fill="#E8ECF0"),
+            settings_btn.itemconfig(self._settings_btn_bg, fill="#D0D5DC"),
             self._open_settings()
         ))
 

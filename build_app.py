@@ -59,7 +59,7 @@ def build():
         subprocess.run(
             ["/usr/bin/swiftc", "-o", helper_bin, swift_src],
             check=True,
-            capture_output=True
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         print("MenuBarHelper 编译完成")
     else:

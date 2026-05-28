@@ -10,7 +10,7 @@ from src.constants import (
     COLOR_WINDOW_BG, COLOR_TITLE_BAR, COLOR_TITLE_TEXT, COLOR_TITLE_ACCENT,
     COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY,
     COLOR_BUTTON_PRIMARY, COLOR_BUTTON_PRIMARY_HOVER,
-    COLOR_BUTTON_SECONDARY_BORDER, COLOR_DIVIDER,
+    COLOR_DIVIDER,
     COLOR_STATUS_OK, COLOR_STATUS_WARN, COLOR_STATUS_DANGER,
     COLOR_BTN_TEXT, COLOR_ERROR,
     MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT, AUTO_REFRESH_INTERVAL_MS,
@@ -29,6 +29,7 @@ from src.statusbar import (
 
 CARD_RADIUS = 12
 BTN_RADIUS = 18
+WINDOW_RADIUS = 16
 
 
 def _round_rect(canvas, x1, y1, x2, y2, r, fill, outline="", width=0):
@@ -62,7 +63,15 @@ class MonitorWindow(tk.Toplevel):
         self.minsize(MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT)
 
         self.attributes("-topmost", True)
-        self.configure(bg=COLOR_WINDOW_BG)
+
+        # 透明窗口 → 圆角效果
+        try:
+            self.attributes('-transparent', True)
+            self.configure(bg='systemTransparent')
+            self._is_transparent = True
+        except tk.TclError:
+            self.configure(bg=COLOR_WINDOW_BG)
+            self._is_transparent = False
 
         self._build_ui()
         self._setup_drag()
@@ -81,66 +90,88 @@ class MonitorWindow(tk.Toplevel):
     # ============================================================
 
     def _build_ui(self):
+        self._build_background()
         self._build_title_bar()
-        self._build_balance_card()
-        self._build_consumption_card()
-        self._build_footer()
+        self._build_content()
+
+    def _build_background(self):
+        """绘制窗口背景（圆角）"""
+        if self._is_transparent:
+            self._bg_canvas = tk.Canvas(
+                self, width=MAIN_WINDOW_WIDTH, height=MAIN_WINDOW_HEIGHT,
+                highlightthickness=0, bg='systemTransparent'
+            )
+            self._bg_canvas.place(x=0, y=0)
+            _round_rect(self._bg_canvas, 1, 1,
+                        MAIN_WINDOW_WIDTH - 1, MAIN_WINDOW_HEIGHT - 1,
+                        WINDOW_RADIUS, fill=COLOR_WINDOW_BG)
+        else:
+            self._bg_canvas = None
 
     def _build_title_bar(self):
-        bar = tk.Frame(self, bg=COLOR_TITLE_BAR, height=32)
-        bar.pack(fill="x")
+        """自定义标题栏"""
+        bg = 'systemTransparent' if self._is_transparent else COLOR_TITLE_BAR
+        bar = tk.Frame(self, bg=bg, height=36)
+        bar.pack(fill="x", padx=(14, 8) if self._is_transparent else (0, 0))
         bar.pack_propagate(False)
 
         # 左边品牌标题
-        left = tk.Frame(bar, bg=COLOR_TITLE_BAR)
-        left.pack(side="left", padx=(14, 0))
+        left = tk.Frame(bar, bg=bg)
+        left.pack(side="left")
 
         tk.Label(
             left, text="Deepseek",
-            font=("SF Pro Display", 12, "bold"),
-            fg=COLOR_TITLE_TEXT, bg=COLOR_TITLE_BAR
+            font=("SF Pro Display", 15, "bold"),
+            fg=COLOR_TITLE_TEXT, bg=bg
         ).pack(side="left")
         tk.Label(
-            left, text=" 用量监控",
+            left, text="用量监控",
             font=("SF Pro Display", 12),
-            fg=COLOR_TITLE_ACCENT, bg=COLOR_TITLE_BAR
-        ).pack(side="left")
+            fg=COLOR_TITLE_ACCENT, bg=bg
+        ).pack(side="left", padx=(2, 0))
 
         # 右边最小化按钮
         self._minimize_btn = tk.Label(
             bar, text="—", font=("SF Pro Display", 14, "bold"),
-            fg=COLOR_TEXT_SECONDARY, bg=COLOR_TITLE_BAR, cursor="hand2",
+            fg=COLOR_TEXT_SECONDARY, bg=bg, cursor="hand2",
             width=2
         )
-        self._minimize_btn.pack(side="right", padx=(0, 4))
+        self._minimize_btn.pack(side="right")
         self._minimize_btn.bind("<ButtonRelease-1>", lambda e: self.withdraw())
         self._minimize_btn.bind("<Enter>", lambda e: self._minimize_btn.config(fg=COLOR_TEXT_PRIMARY))
         self._minimize_btn.bind("<Leave>", lambda e: self._minimize_btn.config(fg=COLOR_TEXT_SECONDARY))
 
         self._title_bar = bar
 
-    def _build_balance_card(self):
-        """余额状态卡片 — Canvas 圆角白底"""
+    def _build_content(self):
+        """构建卡片区域"""
+        content_bg = 'systemTransparent' if self._is_transparent else COLOR_WINDOW_BG
+        content = tk.Frame(self, bg=content_bg)
+        content.pack(fill="both", expand=True, padx=16)
+
+        self._build_balance_card(content)
+        self._build_consumption_card(content)
+        self._build_footer(content)
+
+    def _build_balance_card(self, parent):
+        """余额状态卡片"""
         card_w = MAIN_WINDOW_WIDTH - 32
         card_h = 158
-        card_x = 16
 
         canvas = tk.Canvas(
-            self, width=card_w, height=card_h,
+            parent, width=card_w, height=card_h,
             highlightthickness=0, bg=COLOR_WINDOW_BG
         )
-        canvas.pack(pady=(16, 0))
+        canvas.pack(pady=(8, 0))
 
         _round_rect(canvas, 0, 0, card_w, card_h, CARD_RADIUS,
                     fill=COLOR_CARD_BG, outline=COLOR_CARD_BORDER, width=1)
 
-        # 交通信号灯（居中）
         light_container = tk.Frame(canvas, bg=COLOR_CARD_BG)
         self._traffic_light = TrafficLight(light_container, balance=0.0, bg=COLOR_CARD_BG)
         self._traffic_light.pack()
         canvas.create_window(card_w // 2, 36, window=light_container)
 
-        # 余额大号字体
         self._balance_label = tk.Label(
             canvas, text="¥ --.--",
             font=("SF Pro Display", 34, "bold"),
@@ -148,7 +179,6 @@ class MonitorWindow(tk.Toplevel):
         )
         canvas.create_window(card_w // 2, 94, window=self._balance_label)
 
-        # 余额状态文字
         self._balance_status = tk.Label(
             canvas, text="",
             font=("SF Pro Display", 11),
@@ -158,13 +188,13 @@ class MonitorWindow(tk.Toplevel):
 
         self._balance_canvas = canvas
 
-    def _build_consumption_card(self):
+    def _build_consumption_card(self, parent):
         """消费明细卡片"""
         card_w = MAIN_WINDOW_WIDTH - 32
         card_h = 88
 
         canvas = tk.Canvas(
-            self, width=card_w, height=card_h,
+            parent, width=card_w, height=card_h,
             highlightthickness=0, bg=COLOR_WINDOW_BG
         )
         canvas.pack(pady=(12, 0))
@@ -175,7 +205,6 @@ class MonitorWindow(tk.Toplevel):
         row_y1 = 24
         row_y2 = 64
 
-        # 今日消费
         canvas.create_text(
             18, row_y1, text="今日消费", anchor="w",
             font=("SF Pro Display", 12), fill=COLOR_TEXT_SECONDARY
@@ -185,13 +214,11 @@ class MonitorWindow(tk.Toplevel):
             font=("SF Pro Display", 14, "bold"), fill=COLOR_TEXT_PRIMARY
         )
 
-        # 分割线
         canvas.create_line(
             16, 44, card_w - 16, 44,
             fill=COLOR_DIVIDER, width=1
         )
 
-        # 本周消费
         canvas.create_text(
             18, row_y2, text="本周消费", anchor="w",
             font=("SF Pro Display", 12), fill=COLOR_TEXT_SECONDARY
@@ -203,32 +230,31 @@ class MonitorWindow(tk.Toplevel):
 
         self._consumption_canvas = canvas
 
-    def _build_footer(self):
+    def _build_footer(self, parent):
         """底部：更新时间 + 操作按钮"""
-        # 更新时间
+        bg = 'systemTransparent' if self._is_transparent else COLOR_WINDOW_BG
+
         self._update_time = tk.Label(
-            self, text="最后更新: --:--:--",
+            parent, text="最后更新: --:--:--",
             font=("SF Pro Display", 10),
-            fg=COLOR_TEXT_SECONDARY, bg=COLOR_WINDOW_BG
+            fg=COLOR_TEXT_SECONDARY, bg=bg
         )
         self._update_time.pack(pady=(14, 6))
 
-        # 错误提示
         self._error_label = tk.Label(
-            self, text="",
+            parent, text="",
             font=("SF Pro Display", 10),
-            fg=COLOR_ERROR, bg=COLOR_WINDOW_BG
+            fg=COLOR_ERROR, bg=bg
         )
         self._error_label.pack()
 
-        # 按钮行
-        btn_frame = tk.Frame(self, bg=COLOR_WINDOW_BG)
+        btn_frame = tk.Frame(parent, bg=bg)
         btn_frame.pack(pady=(12, 14))
 
-        # 刷新按钮（蓝色填充胶囊）
+        # 刷新按钮（蓝色胶囊）
         refresh_btn = tk.Canvas(
             btn_frame, width=110, height=36,
-            highlightthickness=0, bg=COLOR_WINDOW_BG, cursor="hand2"
+            highlightthickness=0, bg=bg, cursor="hand2"
         )
         refresh_btn.pack(side="left", padx=(0, 10))
         self._refresh_btn_bg = _round_rect(
@@ -247,24 +273,24 @@ class MonitorWindow(tk.Toplevel):
         ))
         self._refresh_canvas = refresh_btn
 
-        # 账号设置按钮（白色描边胶囊）
+        # 账号设置按钮（灰色胶囊，无边框）
         settings_btn = tk.Canvas(
             btn_frame, width=110, height=36,
-            highlightthickness=0, bg=COLOR_WINDOW_BG, cursor="hand2"
+            highlightthickness=0, bg=bg, cursor="hand2"
         )
         settings_btn.pack(side="left")
         self._settings_btn_bg = _round_rect(
             settings_btn, 0, 0, 110, 36, BTN_RADIUS,
-            fill=COLOR_CARD_BG, outline=COLOR_BUTTON_SECONDARY_BORDER, width=1.5
+            fill="#E8ECF0"
         )
         settings_btn.create_text(
             55, 18, text="账号设置",
-            font=("SF Pro Display", 12), fill=COLOR_BUTTON_SECONDARY_BORDER
+            font=("SF Pro Display", 12), fill=COLOR_TEXT_PRIMARY
         )
         settings_btn.bind("<ButtonPress-1>", lambda e: settings_btn.itemconfig(
-            self._settings_btn_bg, fill="#EBF0F7"))
+            self._settings_btn_bg, fill="#D0D5DC"))
         settings_btn.bind("<ButtonRelease-1>", lambda e: (
-            settings_btn.itemconfig(self._settings_btn_bg, fill=COLOR_CARD_BG),
+            settings_btn.itemconfig(self._settings_btn_bg, fill="#E8ECF0"),
             self._open_settings()
         ))
 
@@ -301,13 +327,9 @@ class MonitorWindow(tk.Toplevel):
         balance = parse_balance(balance_data)
         record_balance_snapshot(balance)
 
-        # 更新信号灯
         self._traffic_light.set_balance(balance)
-
-        # 更新余额
         self._balance_label.config(text=f"¥ {balance:.2f}")
 
-        # 更新状态文字
         from src.storage import get_thresholds
         threshold_red, threshold_yellow = get_thresholds()
         if balance <= threshold_red:
@@ -321,7 +343,6 @@ class MonitorWindow(tk.Toplevel):
             status_color = COLOR_STATUS_OK
         self._balance_status.config(text=status_text, fg=status_color)
 
-        # 更新消费
         today = get_today_consumption()
         week = get_week_consumption()
         self._consumption_canvas.itemconfig(
@@ -329,12 +350,10 @@ class MonitorWindow(tk.Toplevel):
         self._consumption_canvas.itemconfig(
             self._week_cost, text=f"¥ {week:.2f}")
 
-        # 更新时间
         now = datetime.now().strftime("%H:%M:%S")
         self._update_time.config(text=f"最后更新: {now}")
         self._error_label.config(text="")
 
-        # 状态栏
         if self.state() == "withdrawn":
             try:
                 statusbar_set_balance_status(balance)

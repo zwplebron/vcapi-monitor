@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Build artifacts
+DeepseekMonitor.app/
+MenuBarHelper
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+/tmp/

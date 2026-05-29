@@ -32,9 +32,22 @@ def _ensure_dir():
 def save_api_key(api_key: str):
     """保存 API Key（base64 编码后存储）"""
     _ensure_dir()
+    config = _load_config()
     encoded = base64.b64encode(api_key.encode("utf-8")).decode("utf-8")
+    config["api_key"] = encoded
+    config["deepseek_enabled"] = True
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump({"api_key": encoded}, f, ensure_ascii=False, indent=2)
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+def _load_config() -> dict:
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def load_api_key() -> Optional[str]:
@@ -42,8 +55,7 @@ def load_api_key() -> Optional[str]:
     if not os.path.exists(CONFIG_FILE):
         return None
     try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
+        config = _load_config()
         encoded = config.get("api_key", "")
         if not encoded:
             return None
@@ -53,16 +65,55 @@ def load_api_key() -> Optional[str]:
 
 
 def clear_api_key():
-    """删除 API Key 配置"""
+    """删除所有账号配置"""
     if os.path.exists(CONFIG_FILE):
         os.remove(CONFIG_FILE)
 
 
-def config_exists() -> bool:
-    """检查是否已绑定账号"""
-    if not os.path.exists(CONFIG_FILE):
-        return False
+def clear_deepseek_api_key():
+    """删除 Deepseek API Key 配置"""
+    config = _load_config()
+    config.pop("api_key", None)
+    config["deepseek_enabled"] = False
+    _ensure_dir()
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+def set_codex_enabled(enabled: bool):
+    """启用/停用 Codex 本地快照监控"""
+    _ensure_dir()
+    config = _load_config()
+    config["codex_enabled"] = bool(enabled)
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+def codex_enabled() -> bool:
+    return bool(_load_config().get("codex_enabled", False))
+
+
+def deepseek_enabled() -> bool:
     return load_api_key() is not None
+
+
+def config_exists() -> bool:
+    """检查是否已绑定至少一个服务"""
+    return deepseek_enabled() or codex_enabled()
+
+
+def save_bindings(api_key: Optional[str], enable_codex: bool):
+    """保存首次绑定选择"""
+    if api_key:
+        save_api_key(api_key)
+    else:
+        _ensure_dir()
+        config = _load_config()
+        config["deepseek_enabled"] = False
+        config.pop("api_key", None)
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+    set_codex_enabled(enable_codex)
 
 
 # ============================================================
@@ -166,6 +217,13 @@ def _default_settings() -> dict:
         "auto_launch": False,
         "threshold_red": 2.0,
         "threshold_yellow": 10.0,
+        "codex_threshold_red": 10.0,
+        "codex_threshold_yellow": 30.0,
+        "deepseek_refresh_minutes": 5,
+        "codex_refresh_minutes": 5,
+        "statusbar_mode": "auto",
+        "statusbar_alternate_seconds": 5,
+        "main_window_pinned": True,
     }
 
 
@@ -196,3 +254,19 @@ def get_thresholds() -> tuple:
     """返回当前的 (threshold_red, threshold_yellow)"""
     s = load_settings()
     return (s["threshold_red"], s["threshold_yellow"])
+
+
+def get_codex_thresholds() -> tuple:
+    """返回 Codex 剩余百分比阈值 (red, yellow)。"""
+    s = load_settings()
+    return (s["codex_threshold_red"], s["codex_threshold_yellow"])
+
+
+def is_main_window_pinned() -> bool:
+    return bool(load_settings().get("main_window_pinned", True))
+
+
+def set_main_window_pinned(pinned: bool):
+    s = load_settings()
+    s["main_window_pinned"] = bool(pinned)
+    save_settings(s)

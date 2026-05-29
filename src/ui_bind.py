@@ -11,7 +11,7 @@ from src.constants import (
     COLOR_CARD_BG, COLOR_BTN_TEXT, COLOR_ERROR,
     BIND_WINDOW_WIDTH, BIND_WINDOW_HEIGHT,
 )
-from src.storage import save_api_key
+from src.storage import save_bindings
 
 
 class BindWindow(tk.Toplevel):
@@ -20,6 +20,7 @@ class BindWindow(tk.Toplevel):
     def __init__(self, parent, on_bind_success: callable):
         super().__init__(parent)
         self._on_bind_success = on_bind_success
+        self._codex_var = tk.BooleanVar(value=False)
 
         self.title("绑定 Deepseek 账号")
         self.resizable(False, False)
@@ -51,7 +52,7 @@ class BindWindow(tk.Toplevel):
         title.pack(pady=(30, 8))
 
         desc = tk.Label(
-            self, text="请输入你的 Deepseek API Key 完成账号绑定",
+            self, text="绑定 Deepseek API Key，或启用本机 Codex 监控",
             font=("SF Pro Display", 12),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_BG, wraplength=340
         )
@@ -76,11 +77,23 @@ class BindWindow(tk.Toplevel):
         self._key_entry.bind("<Return>", lambda e: self._do_bind())
 
         help_text = tk.Label(
-            self, text="如何获取 API Key？\n登录 platform.deepseek.com → API Keys → 创建",
+            self, text="Deepseek API Key 可在 platform.deepseek.com → API Keys 创建",
             font=("SF Pro Display", 10),
             fg=COLOR_ACCENT, bg=COLOR_BG, cursor="hand2"
         )
-        help_text.pack(pady=(12, 20))
+        help_text.pack(pady=(12, 10))
+
+        codex_check = tk.Checkbutton(
+            self,
+            text="启用 Codex 本机余量监控（读取本机 Codex 使用率快照）",
+            variable=self._codex_var,
+            font=("SF Pro Display", 11),
+            fg=COLOR_TEXT_PRIMARY,
+            bg=COLOR_BG,
+            activebackground=COLOR_BG,
+            selectcolor=COLOR_BG,
+        )
+        codex_check.pack(pady=(0, 14))
 
         bind_btn = tk.Label(
             self, text="绑 定",
@@ -110,19 +123,23 @@ class BindWindow(tk.Toplevel):
     def _do_bind(self):
         api_key = self._key_entry.get().strip()
         placeholder = "请输入 API Key (sk-...)"
+        enable_codex = self._codex_var.get()
 
-        if not api_key or api_key == placeholder:
-            messagebox.showwarning("提示", "请输入 API Key", parent=self)
+        if api_key == placeholder:
+            api_key = ""
+
+        if not api_key and not enable_codex:
+            messagebox.showwarning("提示", "请填写 Deepseek API Key 或启用 Codex 监控", parent=self)
             return
-        if not api_key.startswith("sk-"):
+        if api_key and not api_key.startswith("sk-"):
             messagebox.showwarning("格式错误", "API Key 应以 'sk-' 开头", parent=self)
             return
-        if len(api_key) < 20:
+        if api_key and len(api_key) < 20:
             messagebox.showwarning("格式错误", "API Key 长度不足，请检查", parent=self)
             return
 
         try:
-            save_api_key(api_key)
+            save_bindings(api_key, enable_codex)
             self.destroy()
             self._on_bind_success()
         except Exception as e:

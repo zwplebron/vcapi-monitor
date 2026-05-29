@@ -9,10 +9,11 @@ Deepseek 用量监控 — 全局常量定义
 # 应用版本
 # ============================================================
 
-APP_VERSION = "v1.0.1"
+APP_VERSION = "v1.0.0"
+APP_NAME = "VCAPI Monitor"
 
 # ============================================================
-# 配色方案 (v1.0.1 — 浅色极简风格)
+# 配色方案 (v2.0.0 — 双服务监控风格)
 # ============================================================
 
 # 窗口 / 背景
@@ -46,9 +47,9 @@ COLOR_LIGHT_GLOW_YELLOW = "#FFF5CC"
 COLOR_LIGHT_GLOW_RED = "#FFD6D4"
 
 # 状态文字
-COLOR_STATUS_OK = "#34C759"
-COLOR_STATUS_WARN = "#F57C00"
-COLOR_STATUS_DANGER = "#FF3B30"
+COLOR_STATUS_OK = COLOR_LIGHT_GREEN
+COLOR_STATUS_WARN = COLOR_LIGHT_YELLOW
+COLOR_STATUS_DANGER = COLOR_LIGHT_RED
 
 # 分割线
 COLOR_DIVIDER = "#E8ECF0"
@@ -89,14 +90,14 @@ API_TIMEOUT = 10
 # 窗口尺寸
 # ============================================================
 
-MAIN_WINDOW_WIDTH = 300
-MAIN_WINDOW_HEIGHT = 460
+MAIN_WINDOW_WIDTH = 360
+MAIN_WINDOW_HEIGHT = 450
 
 BIND_WINDOW_WIDTH = 400
-BIND_WINDOW_HEIGHT = 320
+BIND_WINDOW_HEIGHT = 360
 
 SETTINGS_WINDOW_WIDTH = 400
-SETTINGS_WINDOW_HEIGHT = 360
+SETTINGS_WINDOW_HEIGHT = 430
 
 # ============================================================
 # 刷新与快捷键

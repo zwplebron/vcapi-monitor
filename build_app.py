@@ -1,122 +1,74 @@
 """
-打包脚本 — 将 Python 源码打包为 macOS .app 应用
+打包脚本 — 使用 PyInstaller 构建独立的 macOS .app 应用
 
-用法: /usr/bin/python3 build_app.py
+用法: /usr/local/bin/python3.8 build_app.py
 
-生成的 DeepseekMonitor.app 可以拖到 Applications 文件夹，
-双击即可运行。无需安装任何依赖。
+PyInstaller 会嵌入 Python 运行环境，使 .app 拥有独立的应用身份，
+在菜单栏和 Dock 中显示正确的名称和图标。
 """
 
 import os
 import shutil
-import stat
+import subprocess
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-APP_NAME = "DeepseekMonitor.app"
+APP_NAME = "VCAPI Monitor.app"
 APP_PATH = os.path.join(PROJECT_ROOT, APP_NAME)
 PYTHON_BIN = "/usr/local/bin/python3.8"
 
 
 def build():
-    # 清理旧的 .app
+    # 清理旧的构建产物
+    for d in [APP_PATH, os.path.join(PROJECT_ROOT, "build"), os.path.join(PROJECT_ROOT, "dist")]:
+        if os.path.exists(d):
+            shutil.rmtree(d)
+
+    # --- 步骤 1: PyInstaller 构建 ---
+    print("正在构建 .app (PyInstaller)...")
+    env = os.environ.copy()
+    env["TMPDIR"] = "/tmp/claude_tmp"
+    subprocess.run(
+        [PYTHON_BIN, "-m", "PyInstaller", "DeepseekMonitor.spec"],
+        check=True,
+        cwd=PROJECT_ROOT,
+        env=env,
+    )
+
+    # PyInstaller 生成的 .app 在 dist/ 目录
+    dist_app = os.path.join(PROJECT_ROOT, "dist", APP_NAME)
+    if not os.path.exists(dist_app):
+        print(f"错误: PyInstaller 构建失败，dist/ 中没有 {APP_NAME}")
+        return
+
+    # 移动到项目根目录
     if os.path.exists(APP_PATH):
         shutil.rmtree(APP_PATH)
+    shutil.move(dist_app, APP_PATH)
+    shutil.rmtree(os.path.join(PROJECT_ROOT, "dist"))
 
-    # 创建 .app 目录结构
-    contents = os.path.join(APP_PATH, "Contents")
-    macos_dir = os.path.join(contents, "MacOS")
-    resources_dir = os.path.join(contents, "Resources")
-    app_src = os.path.join(resources_dir, "src")
-
-    os.makedirs(macos_dir)
-    os.makedirs(app_src)
-
-    # 复制源码
-    src_dir = os.path.join(PROJECT_ROOT, "src")
-    for f in os.listdir(src_dir):
-        src_file = os.path.join(src_dir, f)
-        dst_file = os.path.join(app_src, f)
-        if os.path.isfile(src_file):
-            shutil.copy2(src_file, dst_file)
-
-    # 复制自定义状态栏图标（如果存在）
-    icon_src = os.path.join(PROJECT_ROOT, "status_icon.png")
-    if os.path.exists(icon_src):
-        shutil.copy2(icon_src, os.path.join(resources_dir, "status_icon.png"))
-        print("状态栏图标已复制")
-
-    # 复制应用图标（如果存在）
-    app_icon_src = os.path.join(PROJECT_ROOT, "app_icon.icns")
-    if os.path.exists(app_icon_src):
-        shutil.copy2(app_icon_src, os.path.join(resources_dir, "app_icon.icns"))
-        print("应用图标已复制")
-
-    # 编译 Swift 状态栏助手
+    # --- 步骤 2: 编译 MenuBarHelper ---
+    helper_bin = os.path.join(APP_PATH, "Contents", "MacOS", "MenuBarHelper")
     swift_src = os.path.join(PROJECT_ROOT, "MenuBarHelper.swift")
-    helper_bin = os.path.join(macos_dir, "MenuBarHelper")
     if os.path.exists("/usr/bin/swiftc"):
-        import subprocess
         subprocess.run(
             ["/usr/bin/swiftc", "-o", helper_bin, swift_src],
             check=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         print("MenuBarHelper 编译完成")
     else:
-        print("警告: swiftc 不可用，跳过状态栏助手编译")
+        print("警告: swiftc 不可用")
 
-    # 创建 Python 启动脚本（直接作为可执行文件，不用 bash 包装）
-    launcher = os.path.join(macos_dir, "DeepseekMonitor")
-    with open(launcher, "w") as f:
-        f.write(f"""#!/usr/local/bin/python3.8
-import sys, os
+    # --- 步骤 3: 确保图标就位 ---
+    resources_dir = os.path.join(APP_PATH, "Contents", "Resources")
+    icon_src = os.path.join(PROJECT_ROOT, "status_icon.png")
+    if os.path.exists(icon_src):
+        dst = os.path.join(resources_dir, "status_icon.png")
+        if not os.path.exists(dst):
+            shutil.copy2(icon_src, dst)
+            print("状态栏图标已复制")
 
-_resources = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_resources = os.path.join(_resources, "Resources")
-_src = os.path.join(_resources, "src")
-
-sys.path.insert(0, _resources)
-sys.path.insert(0, _src)
-os.chdir(_resources)
-
-from src.main import main
-main()
-""")
-    os.chmod(launcher, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-
-    # 创建 Info.plist
-    plist_path = os.path.join(contents, "Info.plist")
-    with open(plist_path, "w") as f:
-        f.write("""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
- "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleName</key>
-    <string>DeepseekMonitor</string>
-    <key>CFBundleDisplayName</key>
-    <string>Deepseek 用量监控</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.deepseek.monitor</string>
-    <key>CFBundleVersion</key>
-    <string>1.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleExecutable</key>
-    <string>DeepseekMonitor</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>10.15</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>CFBundleIconFile</key>
-    <string>app_icon.icns</string>
-</dict>
-</plist>""")
-
-    print(f"打包完成: {APP_PATH}")
-    print("将 DeepseekMonitor.app 拖到 Applications 文件夹即可使用。")
+    print(f"\n打包完成: {APP_PATH}")
+    print("将 \"VCAPI Monitor.app\" 拖到 Applications 文件夹即可使用。")
 
 
 if __name__ == "__main__":

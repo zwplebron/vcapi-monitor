@@ -12,7 +12,18 @@ from src.constants import (
     SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT,
     APP_VERSION,
 )
-from src.storage import load_api_key, save_api_key, clear_api_key
+from src.storage import load_api_key, save_api_key, clear_api_key, codex_enabled, set_codex_enabled
+
+
+def _round_rect(canvas, x1, y1, x2, y2, r, fill, outline=""):
+    return canvas.create_polygon([
+        x1 + r, y1, x2 - r, y1,
+        x2, y1, x2, y1 + r,
+        x2, y2 - r, x2, y2,
+        x2 - r, y2, x1 + r, y2,
+        x1, y2, x1, y2 - r,
+        x1, y1 + r, x1, y1,
+    ], smooth=True, fill=fill, outline=outline, width=1)
 
 
 class SettingsWindow(tk.Toplevel):
@@ -21,6 +32,9 @@ class SettingsWindow(tk.Toplevel):
     def __init__(self, parent, on_unbind: callable):
         super().__init__(parent)
         self._on_unbind = on_unbind
+        self._codex_var = tk.BooleanVar(value=codex_enabled())
+        self._saved_codex_enabled = self._codex_var.get()
+        self._save_enabled = False
 
         self.title("账号设置")
         self.resizable(False, False)
@@ -34,6 +48,10 @@ class SettingsWindow(tk.Toplevel):
         self.configure(bg=COLOR_BG)
         self._build_ui()
         self.transient(self.master)
+        self.attributes("-topmost", True)
+        self.lift()
+        self.focus_force()
+        self.after(0, self._update_save_state)
 
     def _build_ui(self):
         api_key = load_api_key() or ""
@@ -46,12 +64,14 @@ class SettingsWindow(tk.Toplevel):
         title.pack(pady=(30, 16))
 
         # 当前 Key 显示
-        key_frame = tk.Frame(self, bg=COLOR_CARD_BG, highlightbackground="#E0E0E0",
-                             highlightthickness=1)
-        key_frame.pack(padx=30, fill="x", ipady=10)
+        key_shell = tk.Canvas(self, width=340, height=120, highlightthickness=0, bg=COLOR_BG)
+        key_shell.pack(padx=30)
+        _round_rect(key_shell, 0, 0, 340, 120, 12, fill=COLOR_CARD_BG, outline="#E0E0E0")
+        key_frame = tk.Frame(key_shell, bg=COLOR_CARD_BG)
+        key_shell.create_window(10, 10, anchor="nw", window=key_frame, width=320, height=100)
 
         tk.Label(
-            key_frame, text="当前 API Key",
+            key_frame, text="当前 Deepseek API Key",
             font=("SF Pro Display", 11),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         ).pack(pady=(12, 4))
@@ -70,51 +90,66 @@ class SettingsWindow(tk.Toplevel):
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_BG
         ).pack(pady=(16, 4), anchor="w", padx=30)
 
+        entry_shell = tk.Canvas(self, width=340, height=42, highlightthickness=0, bg=COLOR_BG)
+        entry_shell.pack(padx=30, fill="x")
+        _round_rect(entry_shell, 0, 0, 340, 42, 11, fill=COLOR_CARD_BG, outline="#E0E0E0")
         self._new_key_entry = tk.Entry(
-            self,
+            entry_shell,
             font=("SF Pro Display", 13),
             fg=COLOR_TEXT_PRIMARY, bg=COLOR_CARD_BG,
-            relief="solid", show="*",
-            highlightbackground="#E0E0E0", highlightthickness=1,
+            relief="flat", bd=0, show="*",
+            highlightthickness=0,
             insertbackground=COLOR_ACCENT
         )
-        self._new_key_entry.pack(padx=30, fill="x", ipady=6)
+        entry_shell.create_window(12, 21, anchor="w", window=self._new_key_entry, width=316, height=24)
         self._new_key_entry.insert(0, "输入新的 API Key")
         self._new_key_entry.config(fg=COLOR_TEXT_SECONDARY, show="")
         self._new_key_entry.bind("<FocusIn>", self._on_focus_in)
         self._new_key_entry.bind("<FocusOut>", self._on_focus_out)
+        self._new_key_entry.bind("<KeyRelease>", lambda e: self._update_save_state())
+
+        codex_check = tk.Checkbutton(
+            self,
+            text="启用 Codex 本机余量监控",
+            variable=self._codex_var,
+            font=("SF Pro Display", 11),
+            fg=COLOR_TEXT_PRIMARY,
+            bg=COLOR_BG,
+            activebackground=COLOR_BG,
+            selectcolor=COLOR_BG,
+        )
+        codex_check.pack(pady=(12, 0), anchor="w", padx=30)
+        self._codex_var.trace_add("write", lambda *a: self._update_save_state())
 
         # 按钮行
         btn_frame = tk.Frame(self, bg=COLOR_BG)
-        btn_frame.pack(pady=(16, 20))
+        btn_frame.pack(pady=(16, 10))
 
-        save_btn = tk.Label(
-            btn_frame, text="保 存",
-            font=("SF Pro Display", 13, "bold"),
-            fg=COLOR_BTN_TEXT, bg=COLOR_ACCENT,
-            cursor="hand2", padx=24, pady=4
-        )
-        save_btn.pack(side="left", padx=(0, 8))
-        save_btn.bind("<ButtonPress-1>", lambda e: e.widget.config(bg="#1E88E5"))
-        save_btn.bind("<ButtonRelease-1>", lambda e: (e.widget.config(bg=COLOR_ACCENT), self._do_save()))
+        self._save_btn = tk.Canvas(btn_frame, width=110, height=36, highlightthickness=0, bg=COLOR_BG)
+        self._save_btn.pack(side="left", padx=(0, 10))
+        self._save_btn_bg = _round_rect(self._save_btn, 0, 0, 110, 36, 16, fill="#D5D7DB")
+        self._save_btn_text = self._save_btn.create_text(55, 18, text="保存", font=("SF Pro Display", 13, "bold"), fill=COLOR_TEXT_SECONDARY)
+        self._save_btn.bind("<Enter>", lambda e: self._on_save_hover(True))
+        self._save_btn.bind("<Leave>", lambda e: self._on_save_hover(False))
+        self._save_btn.bind("<ButtonPress-1>", lambda e: self._on_save_press())
+        self._save_btn.bind("<ButtonRelease-1>", lambda e: self._on_save_release())
 
-        unbind_btn = tk.Label(
-            btn_frame, text="解绑账号",
-            font=("SF Pro Display", 13),
-            fg=COLOR_BTN_DANGER_TEXT, bg=COLOR_BG,
-            cursor="hand2", padx=16, pady=4,
-            highlightbackground="#E53935", highlightthickness=1
-        )
+        unbind_btn = tk.Canvas(btn_frame, width=110, height=36, highlightthickness=0, bg=COLOR_BG)
         unbind_btn.pack(side="left")
-        unbind_btn.bind("<ButtonPress-1>", lambda e: e.widget.config(bg="#FFEBEE"))
-        unbind_btn.bind("<ButtonRelease-1>", lambda e: (e.widget.config(bg=COLOR_BG), self._do_unbind()))
+        self._unbind_btn_bg = _round_rect(unbind_btn, 0, 0, 110, 36, 16, fill="#E57373")
+        unbind_btn.create_text(55, 18, text="解绑", font=("SF Pro Display", 13), fill=COLOR_BTN_TEXT)
+        unbind_btn.bind("<Enter>", lambda e: unbind_btn.itemconfig(self._unbind_btn_bg, fill="#EF5350"))
+        unbind_btn.bind("<Leave>", lambda e: unbind_btn.itemconfig(self._unbind_btn_bg, fill="#E57373"))
+        unbind_btn.bind("<ButtonPress-1>", lambda e: unbind_btn.itemconfig(self._unbind_btn_bg, fill="#E53935"))
+        unbind_btn.bind("<ButtonRelease-1>", lambda e: (unbind_btn.itemconfig(self._unbind_btn_bg, fill="#EF5350"), self._do_unbind()))
 
         # 版本号
-        tk.Label(
+        version_label = tk.Label(
             self, text=APP_VERSION,
-            font=("SF Pro Display", 9),
+            font=("SF Pro Display", 12),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_BG
-        ).pack(side="bottom", pady=(0, 8))
+        )
+        version_label.place(relx=0.5, rely=1.0, y=-16, anchor="s")
 
     def _mask_key(self, key: str) -> str:
         if len(key) <= 11:
@@ -130,23 +165,71 @@ class SettingsWindow(tk.Toplevel):
         if not self._new_key_entry.get():
             self._new_key_entry.insert(0, "输入新的 API Key")
             self._new_key_entry.config(fg=COLOR_TEXT_SECONDARY, show="")
+        self._update_save_state()
+
+    def _has_changes(self) -> bool:
+        typed = self._new_key_entry.get().strip()
+        placeholder = "输入新的 API Key"
+        key_changed = bool(typed) and typed != placeholder
+        codex_changed = self._codex_var.get() != self._saved_codex_enabled
+        return key_changed or codex_changed
+
+    def _update_save_state(self):
+        self._save_enabled = self._has_changes()
+        if self._save_enabled:
+            self._save_btn.itemconfig(self._save_btn_bg, fill=COLOR_ACCENT)
+            self._save_btn.itemconfig(self._save_btn_text, fill=COLOR_BTN_TEXT)
+        else:
+            self._save_btn.itemconfig(self._save_btn_bg, fill="#D5D7DB")
+            self._save_btn.itemconfig(self._save_btn_text, fill=COLOR_TEXT_SECONDARY)
+
+    def _on_save_hover(self, entering: bool):
+        if not self._save_enabled:
+            return
+        self._save_btn.itemconfig(self._save_btn_bg, fill="#1565C0" if entering else COLOR_ACCENT)
+
+    def _on_save_press(self):
+        if self._save_enabled:
+            self._save_btn.itemconfig(self._save_btn_bg, fill="#0D47A1")
+
+    def _on_save_release(self):
+        if not self._save_enabled:
+            return
+        self._save_btn.itemconfig(self._save_btn_bg, fill="#1565C0")
+        self._do_save()
 
     def _do_save(self):
+        if not self._save_enabled:
+            return
         new_key = self._new_key_entry.get().strip()
         placeholder = "输入新的 API Key"
         if not new_key or new_key == placeholder:
-            messagebox.showwarning("提示", "请输入新的 API Key", parent=self)
+            self._persist_codex_enabled()
             return
         if not new_key.startswith("sk-"):
             messagebox.showwarning("格式错误", "API Key 应以 'sk-' 开头", parent=self)
             return
 
         save_api_key(new_key)
+        self._persist_codex_enabled()
         self._key_label.config(text=self._mask_key(new_key))
         self._new_key_entry.delete(0, "end")
         self._new_key_entry.insert(0, "输入新的 API Key")
         self._new_key_entry.config(fg=COLOR_TEXT_SECONDARY, show="")
-        messagebox.showinfo("成功", "API Key 已更新，将在下次刷新时生效", parent=self)
+        self._update_save_state()
+
+    def _persist_codex_enabled(self):
+        current = self._codex_var.get()
+        if current == self._saved_codex_enabled:
+            return
+        set_codex_enabled(current)
+        self._saved_codex_enabled = current
+        self._update_save_state()
+        try:
+            with open("/tmp/deepseek_app_refresh.txt", "w") as f:
+                f.write("rebuild")
+        except OSError:
+            pass
 
     def _do_unbind(self):
         ok = messagebox.askyesno(

@@ -133,10 +133,20 @@ def main():
 
             # 刷新标记独立检查（不影响其他操作）
             if os.path.exists(refresh_flag):
+                try:
+                    with open(refresh_flag, "r") as f:
+                        refresh_action = f.read().strip()
+                except OSError:
+                    refresh_action = ""
                 os.remove(refresh_flag)
                 try:
                     if state["window"] and state["window"].winfo_exists():
-                        state["window"]._do_refresh()
+                        if refresh_action == "rebuild":
+                            state["window"].destroy()
+                            from src.ui_main import MonitorWindow
+                            state["window"] = MonitorWindow(root, on_unbind=show_bind)
+                        else:
+                            state["window"]._do_refresh()
                 except Exception:
                     pass
 
@@ -158,6 +168,12 @@ def main():
             elif os.path.exists(show_flag):
                 os.remove(show_flag)
                 _show_window(state["window"])
+            else:
+                try:
+                    if state["window"] and state["window"].winfo_exists():
+                        state["window"]._sync_hidden_statusbar()
+                except Exception:
+                    pass
             root.after(500, _check_actions)
         root.after(500, _check_actions)
 
@@ -189,7 +205,7 @@ def _show_window(app):
         if app and app.winfo_exists():
             app.deiconify()
             app.lift()
-            app.attributes("-topmost", True)
+            app.attributes("-topmost", getattr(app, "_pinned", True))
     except Exception:
         pass
 

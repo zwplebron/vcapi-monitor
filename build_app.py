@@ -17,7 +17,32 @@ APP_PATH = os.path.join(PROJECT_ROOT, APP_NAME)
 PYTHON_BIN = "/usr/local/bin/python3.8"
 
 
+def _prepare_menu_bar_icons():
+    """生成状态栏专用模板图标资源（20/40）。"""
+    src = os.path.join(PROJECT_ROOT, "status_icon.png")
+    icons_dir = os.path.join(PROJECT_ROOT, "assets", "icons")
+    out20 = os.path.join(icons_dir, "menu_bar_icon_20.png")
+    out40 = os.path.join(icons_dir, "menu_bar_icon_40.png")
+    os.makedirs(icons_dir, exist_ok=True)
+    if not os.path.exists(src):
+        return
+    subprocess.run(
+        ["/usr/bin/sips", "-z", "20", "20", src, "--out", out20],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["/usr/bin/sips", "-z", "40", "40", src, "--out", out40],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def build():
+    _prepare_menu_bar_icons()
+
     # 清理旧的构建产物
     for d in [APP_PATH, os.path.join(PROJECT_ROOT, "build"), os.path.join(PROJECT_ROOT, "dist")]:
         if os.path.exists(d):

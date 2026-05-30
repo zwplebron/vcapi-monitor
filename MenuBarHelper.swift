@@ -8,26 +8,49 @@ guard args.count >= 2, let pythonPid = Int32(args[1]) else {
 }
 
 let titleFile = "/tmp/deepseek_statusbar_title.txt"
+let widthModeFile = "/tmp/deepseek_statusbar_width_mode.txt"
 
 // Only create initial title file if it doesn't already exist
 if !FileManager.default.fileExists(atPath: titleFile) {
-    try? "¥ --.--".write(toFile: titleFile, atomically: true, encoding: .utf8)
+    try? "ICON".write(toFile: titleFile, atomically: true, encoding: .utf8)
+}
+if !FileManager.default.fileExists(atPath: widthModeFile) {
+    try? "auto".write(toFile: widthModeFile, atomically: true, encoding: .utf8)
 }
 
-// Load custom icon from Resources folder, resize to fit menu bar
+func loadMenuBarTemplateIcon(resourcePath: String) -> NSImage? {
+    let p20 = resourcePath + "/assets/icons/menu_bar_icon_20.png"
+    let p40 = resourcePath + "/assets/icons/menu_bar_icon_40.png"
+    let fallback = resourcePath + "/status_icon.png"
+    let image = NSImage(size: NSSize(width: 20, height: 20))
+    var added = false
+
+    if let d20 = try? Data(contentsOf: URL(fileURLWithPath: p20)),
+       let rep20 = NSBitmapImageRep(data: d20) {
+        image.addRepresentation(rep20)
+        added = true
+    }
+    if let d40 = try? Data(contentsOf: URL(fileURLWithPath: p40)),
+       let rep40 = NSBitmapImageRep(data: d40) {
+        image.addRepresentation(rep40)
+        added = true
+    }
+    if !added, let fallbackImage = NSImage(contentsOfFile: fallback) {
+        fallbackImage.size = NSSize(width: 18, height: 18)
+        fallbackImage.isTemplate = true
+        return fallbackImage
+    }
+
+    if !added { return nil }
+    image.size = NSSize(width: 18, height: 18)
+    image.isTemplate = true
+    return image
+}
+
+// Load custom icon from Resources folder.
 var statusIcon: NSImage? = nil
 if let resourcePath = Bundle.main.resourcePath {
-    let iconPath = resourcePath + "/status_icon.png"
-    if FileManager.default.fileExists(atPath: iconPath) {
-        if let icon = NSImage(contentsOfFile: iconPath) {
-            icon.isTemplate = true
-            // 适配状态栏高度（通常 24pt，留 4pt 边距）
-            let barThickness = NSStatusBar.system.thickness
-            let iconSize = barThickness - 6
-            icon.size = NSSize(width: iconSize, height: iconSize)
-            statusIcon = icon
-        }
-    }
+    statusIcon = loadMenuBarTemplateIcon(resourcePath: resourcePath)
 }
 
 let app = NSApplication.shared
@@ -84,8 +107,9 @@ class HelperDelegate: NSObject, NSApplicationDelegate {
 
     func updateButton(title: String) {
         guard let button = statusItem.button else { return }
-        if title == "▪" && icon != nil {
+        if title == "ICON", let icon = icon {
             button.image = icon
+            button.imageScaling = .scaleProportionallyUpOrDown
             button.title = ""
         } else {
             button.image = nil
@@ -100,14 +124,16 @@ let initialTitle: String
 if let text = try? String(contentsOfFile: titleFile, encoding: .utf8) {
     initialTitle = text.trimmingCharacters(in: .whitespacesAndNewlines)
 } else {
-    initialTitle = "¥ --.--"
+    initialTitle = "ICON"
 }
 
 if let button = statusItem.button {
-    if initialTitle == "▪" && statusIcon != nil {
-        button.image = statusIcon
+    if initialTitle == "ICON", let icon = statusIcon {
+        button.image = icon
+        button.imageScaling = .scaleProportionallyUpOrDown
         button.title = ""
     } else {
+        button.image = nil
         button.title = initialTitle
     }
 }
@@ -130,6 +156,12 @@ Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             DispatchQueue.main.async {
                 delegate.updateButton(title: trimmed)
             }
+        }
+    }
+    if let widthMode = try? String(contentsOfFile: widthModeFile, encoding: .utf8) {
+        let mode = widthMode.trimmingCharacters(in: .whitespacesAndNewlines)
+        DispatchQueue.main.async {
+            statusItem.length = (mode == "fixed") ? 106 : NSStatusItem.variableLength
         }
     }
 }

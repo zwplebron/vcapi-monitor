@@ -124,3 +124,31 @@ secondary_remaining_percent = 100 - secondary.used_percent
 可以自动获取 Codex 的“使用率百分比快照”，适合满足“让用户直观看到还剩多少余量”的核心目标。
 
 暂时不能确认存在稳定公开的 Codex credits 余额查询 API。V2.0.0 应优先以百分比显示为核心，把 credits balance 作为可选字段。
+
+## 缓存命中率补充探测
+
+2026-05-30 进一步扫描本机 `~/.codex/sessions/**/*.jsonl` 中最近的 `token_count` 事件后，确认当前可见的 `rate_limits` 仅包含以下字段：
+
+- `primary.used_percent`
+- `primary.window_minutes`
+- `primary.resets_at`
+- `secondary.used_percent`
+- `secondary.window_minutes`
+- `secondary.resets_at`
+- `credits.has_credits`
+- `credits.unlimited`
+- `credits.balance`
+- `plan_type`
+- `rate_limit_reached_type`
+
+探测结果：
+
+- 未发现任何明显的缓存命中率字段，例如 `cache_hit`、`cached_tokens`、`hit_rate`、`prompt_cache_*`
+- 也未发现可直接用于计算“缓存命中率”的显式数值
+- 目前仅能确认 Codex 有“使用率百分比快照”，没有证据表明能从现有本地日志直接拿到缓存命中率
+
+对产品的含义：
+
+- Codex 的“缓存命中率”不能先当成已支持字段来设计最终文案
+- 如果后续要做，必须先定义“命中率”的计算来源，是本地日志、CLI 输出还是别的接口
+- 在没有新证据前，UI 侧最多预留占位，不建议承诺准确数值

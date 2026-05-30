@@ -16,7 +16,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import signal
 import tkinter as tk
-from src.constants import LOCK_FILE, APP_SUPPORT_DIR
+from src.constants import LOCK_FILE, APP_SUPPORT_DIR, APP_NAME, APP_VERSION
 from src.storage import config_exists
 
 
@@ -73,6 +73,7 @@ def main():
     root = tk.Tk()
     root.overrideredirect(True)
     root.withdraw()
+    _install_about_dialog(root)
 
     # 存储当前显示的窗口引用
     state = {"window": None, "settings_window": None}
@@ -184,6 +185,90 @@ def main():
         show_monitor()
 
     root.mainloop()
+
+
+def _install_about_dialog(root):
+    """接管 macOS 应用菜单的 About 面板，展示自定义信息。"""
+
+    def _show_about():
+        from tkinter import Toplevel
+
+        for child in root.winfo_children():
+            if isinstance(child, Toplevel) and getattr(child, "_is_about_dialog", False):
+                child.deiconify()
+                child.lift()
+                child.focus_force()
+                return
+
+        win = Toplevel(root)
+        win._is_about_dialog = True
+        win.title(f"关于 {APP_NAME}")
+        win.configure(bg="#EDF1F5")
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+        win.transient(root)
+
+        try:
+            icon_path = os.path.join(_PROJECT_ROOT, "status_icon.png")
+            if os.path.exists(icon_path):
+                icon_img = tk.PhotoImage(file=icon_path).subsample(12, 12)
+                icon_label = tk.Label(win, image=icon_img, bg="#EDF1F5")
+                icon_label.image = icon_img
+                icon_label.pack(pady=(14, 6))
+        except Exception:
+            pass
+
+        tk.Label(
+            win, text=APP_NAME,
+            font=("SF Pro Display", 18, "bold"),
+            fg="#1A1A2E", bg="#EDF1F5"
+        ).pack(pady=(0, 2), padx=24)
+        tk.Label(
+            win, text=APP_VERSION,
+            font=("SF Pro Display", 12),
+            fg="#8E8E93", bg="#EDF1F5"
+        ).pack()
+        tk.Label(
+            win,
+            text="API Usage Monitor for Deepseek & Codex\nCopyright © 2026",
+            justify="center",
+            font=("SF Pro Display", 11),
+            fg="#1A1A2E", bg="#EDF1F5"
+        ).pack(pady=(10, 14), padx=24)
+
+        ok_btn = tk.Canvas(win, width=126, height=34, highlightthickness=0, bg="#EDF1F5")
+        ok_btn.pack(pady=(4, 14))
+        ok_bg = ok_btn.create_rectangle(0, 0, 126, 34, outline="", fill="#1976D2")
+        ok_text = ok_btn.create_text(
+            63, 17, text="确定",
+            font=("SF Pro Display", 12, "bold"),
+            fill="#FFFFFF"
+        )
+
+        def _ok_fill(color: str):
+            ok_btn.itemconfig(ok_bg, fill=color)
+
+        ok_btn.bind("<Enter>", lambda e: _ok_fill("#1565C0"))
+        ok_btn.bind("<Leave>", lambda e: _ok_fill("#1976D2"))
+        ok_btn.bind("<ButtonPress-1>", lambda e: _ok_fill("#0D47A1"))
+        ok_btn.bind("<ButtonRelease-1>", lambda e: (ok_btn.after_idle(win.destroy), _ok_fill("#1565C0")))
+        ok_btn.tag_bind(ok_text, "<ButtonPress-1>", lambda e: _ok_fill("#0D47A1"))
+        ok_btn.tag_bind(ok_text, "<ButtonRelease-1>", lambda e: (ok_btn.after_idle(win.destroy), _ok_fill("#1565C0")))
+        ok_btn.tag_bind(ok_text, "<Enter>", lambda e: _ok_fill("#1565C0"))
+        ok_btn.tag_bind(ok_text, "<Leave>", lambda e: _ok_fill("#1976D2"))
+
+        win.update_idletasks()
+        w = max(300, win.winfo_reqwidth())
+        h = max(210, win.winfo_reqheight())
+        x = int((win.winfo_screenwidth() - w) / 2)
+        y = int((win.winfo_screenheight() - h) / 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        win.focus_force()
+
+    try:
+        root.createcommand("tkAboutDialog", _show_about)
+    except Exception:
+        pass
 
 
 def _toggle_window(app):

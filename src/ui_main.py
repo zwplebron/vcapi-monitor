@@ -23,7 +23,8 @@ from src.storage import (
     get_today_consumption, get_week_consumption,
     codex_enabled, is_main_window_pinned, set_main_window_pinned, load_settings,
 )
-from src.codex_usage import find_latest_snapshot
+from src.cache_stats import get_today_deepseek_cache_stats
+from src.codex_usage import find_latest_snapshot, get_today_cache_stats as get_today_codex_cache_stats
 from src.ui_settings import SettingsWindow
 from src.statusbar import (
     set_services_status as statusbar_set_services_status,
@@ -79,6 +80,30 @@ def _next_reset_epoch(base_reset_ts: int, window_minutes: int) -> int:
     step = window_minutes * 60
     passed = (now - base_reset_ts) // step + 1
     return base_reset_ts + passed * step
+
+
+def _format_tokens(value: int) -> str:
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.2f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.1f}K"
+    return str(value)
+
+
+def _format_cache_rate(stats) -> str:
+    if not stats or stats.hit_rate is None:
+        return "Cache --%"
+    return f"Cache {stats.hit_rate:.1f}%"
+
+
+def _format_cache_detail(stats) -> str:
+    if not stats:
+        return "输入 -- · 命中 -- · 未命中 --"
+    return (
+        f"输入 {_format_tokens(stats.input_tokens)} · "
+        f"命中 {_format_tokens(stats.cached_input_tokens)} · "
+        f"未命中 {_format_tokens(stats.cache_miss_tokens)}"
+    )
 
 
 class MonitorWindow(tk.Toplevel):
@@ -223,10 +248,10 @@ class MonitorWindow(tk.Toplevel):
         y = 48
         if self._deepseek_enabled:
             self._build_deepseek_card(y)
-            y += 164
+            y += 204
         if self._codex_enabled:
             self._build_codex_card(y)
-            y += 154
+            y += 194
         if not self._deepseek_enabled and not self._codex_enabled:
             self._build_empty_card(y)
             y += 132
@@ -247,7 +272,7 @@ class MonitorWindow(tk.Toplevel):
     def _build_deepseek_card(self, y):
         """Deepseek 余额卡片"""
         card_w = MAIN_WINDOW_WIDTH - 32
-        card_h = 150
+        card_h = 190
 
         canvas = tk.Canvas(
             self._shell_canvas, width=card_w, height=card_h,
@@ -270,28 +295,42 @@ class MonitorWindow(tk.Toplevel):
             font=("SF Pro Display", 30, "bold"),
             fg=COLOR_TEXT_PRIMARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(18, 72, anchor="w", window=self._deepseek_balance_label)
+        canvas.create_window(18, 66, anchor="w", window=self._deepseek_balance_label)
 
         self._deepseek_status_label = tk.Label(
             canvas, text="",
             font=("SF Pro Display", 12, "bold"),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(card_w - 18, 74, anchor="e", window=self._deepseek_status_label)
+        canvas.create_window(card_w - 18, 68, anchor="e", window=self._deepseek_status_label)
 
         self._deepseek_detail = tk.Label(
             canvas, text="",
             font=("SF Pro Display", 10),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(18, 108, anchor="w", window=self._deepseek_detail)
+        canvas.create_window(18, 104, anchor="w", window=self._deepseek_detail)
+
+        self._deepseek_cache_rate = tk.Label(
+            canvas, text="Cache --%",
+            font=("SF Pro Display", 12, "bold"),
+            fg=COLOR_TEXT_PRIMARY, bg=COLOR_CARD_BG
+        )
+        canvas.create_window(18, 128, anchor="w", window=self._deepseek_cache_rate)
+
+        self._deepseek_cache_detail = tk.Label(
+            canvas, text="输入 -- · 命中 -- · 未命中 --",
+            font=("SF Pro Display", 9),
+            fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
+        )
+        canvas.create_window(18, 150, anchor="w", window=self._deepseek_cache_detail)
 
         self._deepseek_update_label = tk.Label(
             canvas, text="最后更新 --:--:--",
             font=("SF Pro Display", 9),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(18, 128, anchor="w", window=self._deepseek_update_label)
+        canvas.create_window(18, 170, anchor="w", window=self._deepseek_update_label)
 
         deepseek_refresh_btn = tk.Canvas(
             canvas, width=64, height=22,
@@ -314,14 +353,14 @@ class MonitorWindow(tk.Toplevel):
             self._deepseek_refresh_bg, fill=COLOR_BUTTON_PRIMARY_HOVER))
         deepseek_refresh_btn.bind("<Leave>", lambda e: deepseek_refresh_btn.itemconfig(
             self._deepseek_refresh_bg, fill=COLOR_BUTTON_PRIMARY))
-        canvas.create_window(card_w - 18, 128, anchor="e", window=deepseek_refresh_btn)
+        canvas.create_window(card_w - 18, 170, anchor="e", window=deepseek_refresh_btn)
 
         self._deepseek_canvas = canvas
 
     def _build_codex_card(self, y):
         """Codex 额度卡片"""
         card_w = MAIN_WINDOW_WIDTH - 32
-        card_h = 140
+        card_h = 180
 
         canvas = tk.Canvas(
             self._shell_canvas, width=card_w, height=card_h,
@@ -344,28 +383,42 @@ class MonitorWindow(tk.Toplevel):
             font=("SF Pro Display", 32, "bold"),
             fg=COLOR_TEXT_PRIMARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(18, 72, anchor="w", window=self._codex_remaining_label)
+        canvas.create_window(18, 66, anchor="w", window=self._codex_remaining_label)
 
         self._codex_status_label = tk.Label(
             canvas, text="",
             font=("SF Pro Display", 12, "bold"),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(card_w - 18, 74, anchor="e", window=self._codex_status_label)
+        canvas.create_window(card_w - 18, 68, anchor="e", window=self._codex_status_label)
 
         self._codex_detail = tk.Label(
             canvas, text="请先运行一次 Codex",
             font=("SF Pro Display", 10),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(18, 100, anchor="w", window=self._codex_detail)
+        canvas.create_window(18, 98, anchor="w", window=self._codex_detail)
+
+        self._codex_cache_rate = tk.Label(
+            canvas, text="Cache --%",
+            font=("SF Pro Display", 12, "bold"),
+            fg=COLOR_TEXT_PRIMARY, bg=COLOR_CARD_BG
+        )
+        canvas.create_window(18, 120, anchor="w", window=self._codex_cache_rate)
+
+        self._codex_cache_detail = tk.Label(
+            canvas, text="输入 -- · 命中 -- · 未命中 --",
+            font=("SF Pro Display", 9),
+            fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
+        )
+        canvas.create_window(18, 140, anchor="w", window=self._codex_cache_detail)
 
         self._codex_update_label = tk.Label(
             canvas, text="最后更新 --:--:--",
             font=("SF Pro Display", 9),
             fg=COLOR_TEXT_SECONDARY, bg=COLOR_CARD_BG
         )
-        canvas.create_window(18, 120, anchor="w", window=self._codex_update_label)
+        canvas.create_window(18, 160, anchor="w", window=self._codex_update_label)
 
         codex_refresh_btn = tk.Canvas(
             canvas, width=64, height=22,
@@ -388,7 +441,7 @@ class MonitorWindow(tk.Toplevel):
             self._codex_refresh_bg, fill=COLOR_BUTTON_PRIMARY_HOVER))
         codex_refresh_btn.bind("<Leave>", lambda e: codex_refresh_btn.itemconfig(
             self._codex_refresh_bg, fill=COLOR_BUTTON_PRIMARY))
-        canvas.create_window(card_w - 18, 120, anchor="e", window=codex_refresh_btn)
+        canvas.create_window(card_w - 18, 160, anchor="e", window=codex_refresh_btn)
 
         self._codex_canvas = canvas
 
@@ -510,6 +563,9 @@ class MonitorWindow(tk.Toplevel):
         if balance_data is None or balance_data.get("_error"):
             self._error_label.config(text="Deepseek 刷新失败")
             self._deepseek_detail.config(text="刷新失败，请检查网络")
+            stats = get_today_deepseek_cache_stats()
+            self._deepseek_cache_rate.config(text=_format_cache_rate(stats))
+            self._deepseek_cache_detail.config(text=_format_cache_detail(stats))
             self._deepseek_canvas.itemconfig(self._deepseek_dot, fill=COLOR_TEXT_SECONDARY)
             self._deepseek_update_label.config(text=f"最后更新 {self._last_deepseek_update_text}")
             return
@@ -538,19 +594,25 @@ class MonitorWindow(tk.Toplevel):
 
         today = get_today_consumption()
         week = get_week_consumption()
+        stats = get_today_deepseek_cache_stats()
         self._deepseek_detail.config(text=f"今日 ¥{today:.2f} · 本周 ¥{week:.2f}")
+        self._deepseek_cache_rate.config(text=_format_cache_rate(stats))
+        self._deepseek_cache_detail.config(text=_format_cache_detail(stats))
         self._deepseek_update_label.config(text=f"最后更新 {self._last_deepseek_update_text}")
         self._sync_hidden_statusbar()
 
     def _refresh_codex(self):
         self._last_codex_refresh_ts = time.time()
         snapshot = find_latest_snapshot()
+        stats = get_today_codex_cache_stats()
         self._last_codex_snapshot = snapshot
         self._last_codex_update_text = datetime.now().strftime("%H:%M:%S")
         if not snapshot or snapshot.primary_remaining_percent is None:
             self._codex_remaining_label.config(text="--%")
             self._codex_status_label.config(text="", fg=COLOR_TEXT_SECONDARY)
             self._codex_detail.config(text="请先打开 Codex 并完成一次操作")
+            self._codex_cache_rate.config(text=_format_cache_rate(stats))
+            self._codex_cache_detail.config(text=_format_cache_detail(stats))
             self._codex_canvas.itemconfig(self._codex_dot, fill=COLOR_TEXT_SECONDARY)
             self._codex_update_label.config(text=f"最后更新 {self._last_codex_update_text}")
             self._sync_hidden_statusbar()
@@ -574,6 +636,8 @@ class MonitorWindow(tk.Toplevel):
                 self._codex_remaining_label.config(text="--%")
                 self._codex_status_label.config(text="", fg=COLOR_TEXT_SECONDARY)
                 self._codex_detail.config(text=f"等待新快照 · 下次重置 {_format_reset_time(next_reset_ts)}")
+                self._codex_cache_rate.config(text=_format_cache_rate(stats))
+                self._codex_cache_detail.config(text=_format_cache_detail(stats))
                 self._codex_canvas.itemconfig(self._codex_dot, fill=COLOR_TEXT_SECONDARY)
                 self._codex_update_label.config(text=f"最后更新 {self._last_codex_update_text}")
                 self._sync_hidden_statusbar()
@@ -605,6 +669,8 @@ class MonitorWindow(tk.Toplevel):
         reset_at = _format_reset_time(next_reset_ts or snapshot.primary_resets_at or 0)
         self._codex_status_label.config(text="", fg=status_color)
         self._codex_detail.config(text=f"5小时 {remaining:.0f}%{weekly_text} · 下次重置 {reset_at}{credits_text}")
+        self._codex_cache_rate.config(text=_format_cache_rate(stats))
+        self._codex_cache_detail.config(text=_format_cache_detail(stats))
         self._codex_update_label.config(text=f"最后更新 {self._last_codex_update_text}")
         self._sync_hidden_statusbar()
 

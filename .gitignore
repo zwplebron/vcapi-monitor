@@ -2,7 +2,11 @@
 .DS_Store
 
 # Build artifacts
-DeepseekMonitor.app/
+build/
+dist/
+*.app
+*.dmg
+包/
 MenuBarHelper
 
 # Python
@@ -18,3 +22,7 @@ __pycache__/
 
 # Temp files
 /tmp/
+
+# App data
+logs/
+*.sqlite3

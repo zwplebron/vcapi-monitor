@@ -90,8 +90,8 @@ API_TIMEOUT = 10
 # 窗口尺寸
 # ============================================================
 
-MAIN_WINDOW_WIDTH = 360
-MAIN_WINDOW_HEIGHT = 450
+MAIN_WINDOW_WIDTH = 400
+MAIN_WINDOW_HEIGHT = 560
 
 BIND_WINDOW_WIDTH = 400
 BIND_WINDOW_HEIGHT = 360
@@ -125,4 +125,5 @@ APP_SUPPORT_DIR = os.path.join(
 CONFIG_FILE = os.path.join(APP_SUPPORT_DIR, "config.json")
 BALANCE_LOG_FILE = os.path.join(APP_SUPPORT_DIR, "balance_log.json")
 SETTINGS_FILE = os.path.join(APP_SUPPORT_DIR, "settings.json")
+CACHE_STATS_DB_FILE = os.path.join(APP_SUPPORT_DIR, "cache_stats.sqlite3")
 LOCK_FILE = os.path.join(APP_SUPPORT_DIR, "app.lock")
